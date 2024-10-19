@@ -48,7 +48,7 @@ logging.basicConfig(
 )
 
 def translate(text_jp):
-    prompt = f"请将以下日文翻译成中文：'{text_jp}'"
+    prompt = text_jp
     headers = {
         'Content-Type': 'application/json'
     }
