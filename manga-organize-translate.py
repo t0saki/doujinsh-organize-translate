@@ -20,9 +20,7 @@ use_local_api = True  # 如果不想使用本地API，设置为False
 # 本地API服务器的地址
 api_url = 'http://172.29.238.88:12345/v1/chat/completions'
 
-# 测试API服务器是否可用
-try:
-    text_jp = "こんにちは"
+def translate(text_jp):
     prompt = f"请将以下日文翻译成中文：'{text_jp}'"
     headers = {
         'Content-Type': 'application/json'
@@ -36,7 +34,11 @@ try:
     }
     response = requests.post(api_url, headers=headers, json=data)
     response.raise_for_status()
-    print(f"本地API服务器测试成功：{response.json()['choices'][0]['message']['content'].strip()}")
+    return response.json()['choices'][0]['message']['content'].strip()
+
+# 测试API服务器是否可用
+try:
+    print(f"正在测试本地API服务器：'こんにちは' -> '{translate('こんにちは')}'")
 except Exception as e:
     print(f'本地API服务器测试失败：{e}')
     print('请检查API服务器地址是否正确。')
@@ -101,9 +103,8 @@ for idx, filename in tqdm(enumerate(file_list, 1), ncols=80, total=total_files):
     # 移除文件名的扩展名
     name_without_ext, ext = os.path.splitext(filename)
 
-    # 去除开头的 "数字-" 形式（如果有）
-    if re.match(r'^\d+-', name_without_ext):
-        name_without_ext = re.sub(r'^\d+-', '', name_without_ext)
+    # 去除开头的 "数字-"或者"数字 -"形式（如果有）
+    name_without_ext = re.sub(r'^\d+\s*-\s*', '', name_without_ext)
 
     # 第一步，移除尾部的 [XXXX] 这类带有[]的标识
     name = name_without_ext.strip()
@@ -136,29 +137,17 @@ for idx, filename in tqdm(enumerate(file_list, 1), ncols=80, total=total_files):
         # 判断使用本地API还是Google翻译
         if use_local_api:
             # 使用本地API服务器进行翻译
-            headers = {
-                'Content-Type': 'application/json'
-            }
-            prompt = f"请将以下日文翻译成中文：'{title_jp}'"
-            data = {
-                "model": "qwen2.5-ja-zh",
-                "messages": [
-                    {"role": "user", "content": prompt}
-                ],
-                "temperature": 0,
-                # 可以根据需要调整其他参数
-            }
-            try:
-                response = requests.post(api_url, headers=headers, json=data)
-                response.raise_for_status()
-                result = response.json()
-                # 从API响应中提取翻译结果
-                title_cn = result['choices'][0]['message']['content'].strip()
-                # 去除首尾的_ " ' ( （ 空格等字符
-                title_cn = re.sub(r'^[_"\'（( ]*|[_"\'）) ]*$', '', title_cn)
-            except requests.exceptions.RequestException as e:
-                print(f"翻译失败：{e}")
-                title_cn = title_jp  # 保持原文
+            # 尝试三次
+            for _ in range(3):
+                try:
+                    title_cn = translate(title_jp)
+                    break
+                except Exception as e:
+                    print(f"第{_+1}次翻译失败：{e}")
+                    title_cn = title_jp
+
+            title_cn = re.sub(r'^[_"\'（( ]*|[_"\'）) ]*$', '', title_cn)
+
         else:
             # 使用Google翻译（这里暂时未实现）
             # title_cn = translator.translate(title_jp, src='ja', dest='zh-cn').text
