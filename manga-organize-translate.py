@@ -47,6 +47,8 @@ logging.basicConfig(
     ]
 )
 
+punc = set('…。?!！？.')
+
 def translate(text_jp):
     prompt = text_jp
     headers = {
@@ -61,13 +63,26 @@ def translate(text_jp):
     }
     response = requests.post(api_url, headers=headers, json=data, timeout=30)
     response.raise_for_status()
-    return response.json()['choices'][0]['message']['content'].strip()
+    resp = response.json()['choices'][0]['message']['content'].strip()
+    while resp[-1] in punc:
+        if text_jp[-1] in punc:
+            break
+        else:
+            resp = resp[:-1]
+            text_jp = text_jp[:-1]
+    return resp
+    
 
 def sanitize_filename(name):
     illegal_chars = ['<', '>', ':', '"', '/', '\\', '|', '?', '*']
     for char in illegal_chars:
         name = name.replace(char, '_')
     return name.strip()
+
+def remove_num_suffix(name):
+    name = re.sub(r'\s*(第?\d+(\.\d+)?(?:[巻话話章]|$))$', '', name)
+    name = re.sub(r'\s*(第?[IVXLCDM]+(?:[巻话話章]|$))', '', name)
+    return name
 
 def process_file(args):
     filename, translation_cache, cache_lock = args
@@ -91,9 +106,21 @@ def process_file(args):
             name = name[:pos].strip()
 
         # 第二步，移除尾部的章节号
-        name = re.sub(r'\s*(第?\d+(\.\d+)?(?:[巻话話章]|$))$', '', name)
-        # 移除罗马数字章节号
-        name = re.sub(r'\s*(第?[IVXLCDM]+(?:[巻话話章]|$))', '', name)
+        name = remove_num_suffix(name)
+
+        # 提取尾部（）标签
+        suffix_label = []
+        while name.endswith(')' or '）'):
+            if name.endswith(')'):
+                pos = name.rfind('(')
+            else:
+                pos = name.rfind('（')
+            if pos == -1:
+                break
+            suffix_label.append(name[pos:])
+            name = name[:pos].strip()
+
+        name = remove_num_suffix(name)
 
         # 提取作者信息和标题
         name_start_pos = name.find(']')
@@ -139,6 +166,8 @@ def process_file(args):
         # 构建目标文件夹名
         if author_info:
             dest_folder_name = f'{author_info} {title_cn}'
+            if suffix_label:
+                dest_folder_name += ' ' + ''.join(suffix_label)
         else:
             dest_folder_name = title_cn
 
