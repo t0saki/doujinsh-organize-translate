@@ -12,6 +12,8 @@ import time
 import logging
 from datetime import datetime
 
+import traceback
+
 # 设置源文件夹路径和目标文件夹路径
 source_folder = '/mnt/synology/res/komga/240607-all-aio/'
 target_folder = '/mnt/synology/res/komga/ehentai-organized/'
@@ -153,7 +155,7 @@ def process_file(args):
                             continue
                         else:
                             error_message = f"翻译失败：{e}"
-                            logging.error(f"文件 '{filename}' 的标题 '{title_jp}' 翻译失败。错误信息：{e}")
+                            logging.error(f"文件 '{filename}' 的标题 '{title_jp}' 翻译失败。错误信息：{traceback.format_exc()}")
                             title_cn = title_jp  # 保持原文
             else:
                 # 使用其他翻译方式
@@ -185,7 +187,7 @@ def process_file(args):
         shutil.move(source_path, dest_path)
 
     except Exception as e:
-        logging.error(f"处理文件 '{filename}' 时发生错误：{e}")
+        logging.error(f"处理文件 '{filename}' 时发生错误：{traceback.format_exc()}")
 
 def periodic_save_cache(translation_cache, cache_lock, interval):
     while True:
